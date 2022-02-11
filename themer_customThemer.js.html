@@ -7,7 +7,7 @@
   
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title> sequential/Keyboard.js</title>
+  <title> themer/customThemer.js</title>
 
   <script src="https://cdn.jsdelivr.net/gh/google/code-prettify@master/loader/run_prettify.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -76,7 +76,7 @@
             <div class="content">
                 <header class="page-title">
                     <p>Source</p>
-                    <h1>sequential/Keyboard.js</h1>
+                    <h1>themer/customThemer.js</h1>
                 </header>
                 
 
@@ -85,187 +85,138 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>import CircuitElement from '../circuitElement';
-import Node, { findNode } from '../node';
-import simulationArea from '../simulationArea';
-import { correctWidth, lineTo, moveTo, fillText3 } from '../canvasApi';
+            <pre class="prettyprint source linenums"><code>import { dots } from '../canvasApi';
+import themeOptions from './themes';
+import updateThemeForStyle from './themer';
+import { CreateAbstraction } from './customThemeAbstraction';
+
 /**
- * @class
- * Keyboard
- * KeyBoard - We can give 3 inputs: clock, enable and available.
- * An output of 7 bits is given out when clockInp = 1.
- * @extends CircuitElement
- * @param {number} x - x coord of element
- * @param {number} y - y coord of element
- * @param {Scope=} scope - the ciruit in which we want the Element
- * @param {string=} dir - direcion in which element has to drawn
- * @category sequential
+ *
  */
-import { colors } from '../themer/themer';
-export default class Keyboard extends CircuitElement {
-    constructor(x, y, scope = globalScope, bufferSize = 32) {
-        super(x, y, scope, 'RIGHT', 1);
-        /*
-        this.scope['Keyboard'].push(this);
-        */
-        this.directionFixed = true;
-        this.fixedBitWidth = true;
+var customTheme = CreateAbstraction(themeOptions['Custom Theme']);
 
-        this.bufferSize = bufferSize || parseInt(prompt('Enter buffer size:'));
-        this.elementWidth = Math.max(80, Math.ceil(this.bufferSize / 2) * 20);
-        this.elementHeight = 40; // Math.max(40,Math.ceil(this.rows*15/20)*20);
-        this.setWidth(this.elementWidth / 2);
-        this.setHeight(this.elementHeight / 2);
+const updateBG = () => dots(true, false, true);
 
-        this.clockInp = new Node(-this.elementWidth / 2, this.elementHeight / 2 - 10, 0, this, 1, 'Clock');
-        this.asciiOutput = new Node(30, this.elementHeight / 2, 1, this, 7, 'Ascii Output');
-        this.available = new Node(10, this.elementHeight / 2, 1, this, 1, 'Available');
-        this.reset = new Node(-10, this.elementHeight / 2, 0, this, 1, 'Reset');
-        this.en = new Node(-30, this.elementHeight / 2, 0, this, 1, 'Enable');
-        this.prevClockState = 0;
-        this.buffer = '';
-        this.bufferOutValue = undefined;
-    }
-
-    /**
-     * @memberof Keyboard
-     * this funcion sets the size of maximum input that can
-     * be given to the keyboard at once before it starts sending data.
-     */
-    changeBufferSize(size) {
-        if (size == undefined || size &lt; 20 || size > 100) return;
-        if (this.bufferSize == size) return;
-        var obj = new Keyboard(this.x, this.y, this.scope, size);
-        this.delete();
-        simulationArea.lastSelected = obj;
-        return obj;
-    }
-
-    /**
-     * @memberof Keyboard
-     * Adds the keyy pressed to the buffer
-     */
-    keyDown(key) {
-        if (key.length != 1) return;
-        this.buffer += key;
-        if (this.buffer.length > this.bufferSize) { this.buffer = this.buffer.slice(1); }
-    }
-
-    /**
-     * @memberof Keyboard
-     * not resolvable if enable = 0 or clock is undefined
-     */
-    isResolvable() {
-        if (this.reset.value == 1) return true;
-        if (this.en.value == 0 || (this.en.connections.length &amp;&amp; this.en.value == undefined)) return false;
-        else if (this.clockInp.value == undefined) return false;
-        return true;
-    }
-
-    /**
-     * @memberof Keyboard
-     * Whenever clock is enabled (1) then one charecter
-     * from the buffer is converted to ascii and transmitted 
-     * through the output nodes.
-     */
-    resolve() {
-        if (this.reset.value == 1) {
-            this.buffer = '';
-            return;
-        }
-        if (this.en.value == 0) {
-            return;
-        }
-
-        if (this.available.value != 0) {
-            this.available.value = 0; // this.bufferOutValue;
-            simulationArea.simulationQueue.add(this.available);
-        }
-
-        if (this.clockInp.value == this.prevClockState) {
-            if (this.clockInp.value == 0) {
-                if (this.buffer.length) {
-                    this.bufferOutValue = this.buffer[0].charCodeAt(0);
-                } else {
-                    this.bufferOutValue = undefined;
-                }
-            }
-        } else if (this.clockInp.value != undefined) {
-            if (this.clockInp.value == 1 &amp;&amp; this.buffer.length) {
-                if (this.bufferOutValue == this.buffer[0].charCodeAt(0)) { // WHY IS THIS REQUIRED ??
-                    this.buffer = this.buffer.slice(1);
-                }
-            } else if (this.buffer.length) {
-                this.bufferOutValue = this.buffer[0].charCodeAt(0);
-            } else {
-                this.bufferOutValue = undefined;
-            }
-            this.prevClockState = this.clockInp.value;
-        }
-
-        if (this.asciiOutput.value != this.bufferOutValue) {
-            this.asciiOutput.value = this.bufferOutValue;
-            simulationArea.simulationQueue.add(this.asciiOutput);
-        }
-
-        if (this.bufferOutValue !== undefined &amp;&amp; this.available.value != 1) {
-            this.available.value = 1; // this.bufferOutValue;
-            simulationArea.simulationQueue.add(this.available);
-        }
-    }
-
-    customSave() {
-        var data = {
-            nodes: {
-                clockInp: findNode(this.clockInp),
-                asciiOutput: findNode(this.asciiOutput),
-                available: findNode(this.available),
-                reset: findNode(this.reset),
-                en: findNode(this.en),
-            },
-            constructorParamaters: [this.bufferSize],
-        };
-        return data;
-    }
-
-    customDraw() {
-        var ctx = simulationArea.context;
-        //        
-        ctx.strokeStyle = (colors['stroke']);
-        ctx.fillStyle = (colors['fill']);
-        ctx.beginPath();
-        ctx.lineWidth = correctWidth(3);
-        var xx = this.x;
-        var yy = this.y;
-        moveTo(ctx, -this.elementWidth / 2, this.elementHeight / 2 - 15, xx, yy, this.direction);
-        lineTo(ctx, 5 - this.elementWidth / 2, this.elementHeight / 2 - 10, xx, yy, this.direction);
-        lineTo(ctx, -this.elementWidth / 2, this.elementHeight / 2 - 5, xx, yy, this.direction);
-
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.fillStyle = colors['input_text'];
-        ctx.textAlign = 'center';
-        var lineData = this.buffer + ' '.repeat(this.bufferSize - this.buffer.length);
-        fillText3(ctx, lineData, 0, +5, xx, yy, 15, 'Courier New', 'center');
-        ctx.fill();
-    }
-}
-
-Keyboard.prototype.tooltipText = 'Keyboard';
-Keyboard.prototype.helplink = 'https://docs.circuitverse.org/#/Sequential?id=keyboard';
-
-Keyboard.prototype.mutableProperties = {
-    'bufferSize': {
-        name: 'Buffer Size',
-        type: 'number',
-        max: '100',
-        min: '20',
-        func: 'changeBufferSize',
-    },
+/**
+ * Generates Custom theme card HTML
+ * return Html Element Theme card html (properties_container)
+ */
+const getCustomThemeCard = () => {
+    var propertiesContainer = document.createElement('form');
+    const keys = Object.keys(customTheme);
+    keys.forEach((key) => {
+        const property = document.createElement('div');
+        const newPropertyLabel = document.createElement('label');
+        newPropertyLabel.textContent = `${key} (${customTheme[key].description})`;
+        newPropertyLabel.setAttribute('for', key);
+        const newPropertyInput = document.createElement('input');
+        newPropertyInput.setAttribute('type', 'color');
+        newPropertyInput.setAttribute('name', key);
+        newPropertyInput.setAttribute('value', customTheme[key].color);
+        newPropertyInput.classList.add('customColorInput');
+        property.append(newPropertyLabel);
+        property.append(newPropertyInput);
+        propertiesContainer.append(property);
+    });
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('id', 'downloadThemeFile');
+    downloadAnchor.setAttribute('style', 'display:none');
+    propertiesContainer.appendChild(downloadAnchor);
+    return propertiesContainer;
 };
 
-Keyboard.prototype.objectType = 'Keyboard';
+/**
+* Create Custom Color Themes Dialog
+*/
+export const CustomColorThemes = () => {
+    $('#CustomColorThemesDialog').empty();
+    $('#CustomColorThemesDialog').append(getCustomThemeCard());
+    $('#CustomColorThemesDialog').dialog({
+        resizable: false,
+        close() {
+            themeOptions['Custom Theme'] = JSON.parse(localStorage.getItem('Custom Theme')) || themeOptions['Default Theme']; // hack for closing dialog box without saving
+            // Rollback to previous theme
+            updateThemeForStyle(localStorage.getItem('theme'));
+            updateBG();
+        },
+        buttons: [{
+            text: 'Apply Theme',
+            click() {
+                // update theme to Custom Theme
+                localStorage.setItem('theme', 'Custom Theme');
+                // add Custom theme to custom theme object
+                localStorage.setItem('Custom Theme', JSON.stringify(themeOptions['Custom Theme']));
+                $('.set').removeClass('set');
+                $('.selected').addClass('set');
+                $(this).dialog('close');
+            },
+        }, {
+            text: 'Import Theme',
+            click() {
+                $('#importThemeFile').click();
+            },
+        }, {
+            text: 'Export Theme',
+            click() {
+                const dlAnchorElem = document.getElementById('downloadThemeFile');
+                dlAnchorElem.setAttribute('href', `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(themeOptions['Custom Theme']))}`);
+                dlAnchorElem.setAttribute('download', 'CV_CustomTheme.json');
+                dlAnchorElem.click();
+            },
+        }],
+    });
+
+    $('#CustomColorThemesDialog').focus();
+
+    /**
+     * To preview the changes
+     */
+    $('.customColorInput').on('input', (e) => {
+        customTheme[e.target.name].color = e.target.value;
+        customTheme[e.target.name].ref.forEach((property) => {
+            themeOptions['Custom Theme'][property] = e.target.value;
+        });
+        updateThemeForStyle('Custom Theme');
+        updateBG();
+    });
+
+    // hack for updating current theme to the saved custom theme
+    setTimeout(() => {
+        updateThemeForStyle('Custom Theme');
+        updateBG();
+    }, 50);
+
+    /**
+    * Read JSON file and
+    * set Custom theme to the Content of the JSON file
+    *  */
+    function receivedText(e) {
+        const lines = JSON.parse(e.target.result);
+        customTheme = CreateAbstraction(lines);
+        themeOptions['Custom Theme'] = lines;
+        // preview theme
+        updateThemeForStyle('Custom Theme');
+        updateBG();
+        // update colors in dialog box
+        $('#CustomColorThemesDialog').empty();
+        $('#CustomColorThemesDialog').append(getCustomThemeCard());
+    }
+
+    /**
+     * Add listener for file input
+     * Read imported JSON file
+     */
+    $('#importThemeFile').on('change', (event) => {
+        var File = event.target.files[0];
+        if (File !== null &amp;&amp; File.name.split('.')[1] === 'json') {
+            var fr = new FileReader();
+            fr.onload = receivedText;
+            fr.readAsText(File);
+        } else {
+            alert('File Not Supported !');
+        }
+    });
+};
 </code></pre>
         </article>
     </section>
